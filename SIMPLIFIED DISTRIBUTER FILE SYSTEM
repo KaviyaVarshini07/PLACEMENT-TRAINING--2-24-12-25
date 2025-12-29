@@ -1,0 +1,59 @@
+import java.util.*;
+import java.util.concurrent.*;
+
+public class SimpleDFS {
+    static class Chunk { final String id; final byte[] data; Chunk(String id, byte[] data){ this.id=id; this.data=data; } }
+    static class Node {
+        final String name;
+        final Map<String, Chunk> storage = new ConcurrentHashMap<>();
+        Node(String name){ this.name=name; }
+        void store(Chunk c){ storage.put(c.id, c); }
+        Optional<Chunk> get(String id){ return Optional.ofNullable(storage.get(id)); }
+        boolean has(String id){ return storage.containsKey(id); }
+    }
+    static class Master {
+        final List<Node> nodes; final int repl;
+        Master(List<Node> nodes, int repl){ this.nodes=nodes; this.repl=repl; }
+        void put(String fileId, byte[] data){
+            Chunk c = new Chunk(fileId, data);
+            List<Node> shuffled = new ArrayList<>(nodes);
+            Collections.shuffle(shuffled);
+            for (int i=0; i<Math.min(repl, shuffled.size()); i++) shuffled.get(i).store(c);
+            System.out.println("Stored "+fileId+" on "+Math.min(repl, shuffled.size())+" nodes");
+        }
+        byte[] get(String fileId){
+            for(Node n: nodes) {
+                Optional<Chunk> oc = n.get(fileId);
+                if(oc.isPresent()) return oc.get().data;
+            }
+            throw new RuntimeException("File not found across cluster: "+fileId);
+        }
+        void heal(){
+            // Ensure replication factor by copying from any holder
+            for(Node src: nodes){
+                for(String id: src.storage.keySet()){
+                    int count = 0;
+                    for(Node n: nodes) if(n.has(id)) count++;
+                    if(count < repl){
+                        for(Node n: nodes){
+                            if(!n.has(id)) { n.store(src.storage.get(id)); count++; }
+                            if(count==repl) break;
+                        }
+                    }
+                }
+            }
+            System.out.println("Replication healed to factor "+repl);
+        }
+    }
+
+    public static void main(String[] args){
+        List<Node> nodes = Arrays.asList(new Node("N1"), new Node("N2"), new Node("N3"));
+        Master m = new Master(nodes, 2);
+        m.put("fileA", "Hello DFS".getBytes());
+        System.out.println(new String(m.get("fileA")));
+        // Simulate node loss
+        nodes.get(0).storage.clear();
+        m.heal();
+        System.out.println("Recovered: "+new String(m.get("fileA")));
+    }
+}
