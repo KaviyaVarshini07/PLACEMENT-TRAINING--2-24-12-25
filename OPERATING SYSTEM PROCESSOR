@@ -1,0 +1,43 @@
+import java.util.*;
+
+public class SchedulerSim {
+    static class Proc {
+        final String name; final int burst; int remaining;
+        Proc(String n, int b){ name=n; burst=b; remaining=b; }
+    }
+
+    static List<String> fcfs(List<Proc> procs){
+        List<String> timeline = new ArrayList<>();
+        for(Proc p: procs) timeline.add(p.name+"("+p.burst+")");
+        return timeline;
+    }
+
+    static List<String> sjf(List<Proc> procs){
+        List<Proc> sorted = new ArrayList<>(procs);
+        sorted.sort(Comparator.comparingInt(p -> p.burst));
+        List<String> timeline = new ArrayList<>();
+        for(Proc p: sorted) timeline.add(p.name+"("+p.burst+")");
+        return timeline;
+    }
+
+    static List<String> rr(List<Proc> procs, int quantum){
+        Queue<Proc> q = new ArrayDeque<>();
+        for(Proc p: procs) q.add(new Proc(p.name, p.burst));
+        List<String> timeline = new ArrayList<>();
+        while(!q.isEmpty()){
+            Proc p = q.poll();
+            int run = Math.min(quantum, p.remaining);
+            timeline.add(p.name+"["+run+"]");
+            p.remaining -= run;
+            if(p.remaining > 0) q.add(p);
+        }
+        return timeline;
+    }
+
+    public static void main(String[] args){
+        List<Proc> procs = Arrays.asList(new Proc("P1", 5), new Proc("P2", 3), new Proc("P3", 8));
+        System.out.println("FCFS: "+fcfs(procs));
+        System.out.println("SJF: "+sjf(procs));
+        System.out.println("RR(q=2): "+rr(procs, 2));
+    }
+}
