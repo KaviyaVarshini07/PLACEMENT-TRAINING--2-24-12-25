@@ -1,0 +1,44 @@
+import java.util.*;
+
+public class P2PSim {
+    static class Chunk { final int id; final byte[] data; Chunk(int id, byte[] data){ this.id=id; this.data=data; } }
+    static class Peer {
+        final String name;
+        final Map<Integer, Chunk> chunks = new HashMap<>();
+        final List<Peer> neighbors = new ArrayList<>();
+        Peer(String name){ this.name=name; }
+        void connect(Peer p){ neighbors.add(p); p.neighbors.add(this); }
+        boolean has(int id){ return chunks.containsKey(id); }
+        void add(Chunk c){ chunks.put(c.id, c); }
+        void request(int id){
+            for(Peer n: neighbors){
+                if(n.has(id)){ this.add(n.chunks.get(id)); System.out.println(name+" downloaded chunk "+id+" from "+n.name); return; }
+            }
+            System.out.println(name+" failed to find chunk "+id);
+        }
+        boolean complete(int total){ return chunks.size()==total; }
+    }
+
+    public static void main(String[] args){
+        int totalChunks=4;
+        Chunk[] all = new Chunk[totalChunks];
+        for(int i=0;i<totalChunks;i++) all[i]=new Chunk(i, ("Data"+i).getBytes());
+
+        Peer A = new Peer("A"); Peer B = new Peer("B"); Peer C = new Peer("C");
+        A.connect(B); B.connect(C); // A-B-C line
+        A.add(all[0]); B.add(all[1]); C.add(all[2]); C.add(all[3]);
+
+        // Swarm download
+        Random rnd = new Random();
+        for(int step=0; step<10; step++){
+            Peer[] peers = {A,B,C};
+            Peer p = peers[rnd.nextInt(peers.length)];
+            int id = rnd.nextInt(totalChunks);
+            if(!p.has(id)) p.request(id);
+            if(A.complete(totalChunks)&&B.complete(totalChunks)&&C.complete(totalChunks)) break;
+        }
+        System.out.println("A complete? "+A.complete(totalChunks));
+        System.out.println("B complete? "+B.complete(totalChunks));
+        System.out.println("C complete? "+C.complete(totalChunks));
+    }
+}
