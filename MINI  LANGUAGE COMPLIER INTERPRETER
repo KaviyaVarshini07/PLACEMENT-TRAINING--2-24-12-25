@@ -1,0 +1,71 @@
+import java.util.*;
+
+public class MiniLang {
+    // Token types
+    enum T { NUM, PLUS, MINUS, MUL, DIV, LPAREN, RPAREN, EOF }
+    static class Tok {
+        final T t; final String s;
+        Tok(T t, String s) { this.t = t; this.s = s; }
+    }
+
+    static class Lexer {
+        private final String src; private int i=0;
+        Lexer(String s){src=s;}
+        Tok next(){
+            while(i<src.length() && Character.isWhitespace(src.charAt(i))) i++;
+            if(i>=src.length()) return new Tok(T.EOF,"");
+            char c=src.charAt(i);
+            if(Character.isDigit(c)){ int j=i; while(j<src.length()&& (Character.isDigit(src.charAt(j))||src.charAt(j)=='.')) j++; String n=src.substring(i,j); i=j; return new Tok(T.NUM,n); }
+            i++;
+            switch(c){
+                case '+': return new Tok(T.PLUS,"+");
+                case '-': return new Tok(T.MINUS,"-");
+                case '*': return new Tok(T.MUL,"*");
+                case '/': return new Tok(T.DIV,"/");
+                case '(': return new Tok(T.LPAREN,"(");
+                case ')': return new Tok(T.RPAREN,")");
+                default: throw new RuntimeException("Bad char: "+c);
+            }
+        }
+    }
+
+    // Recursive descent parser: E -> T ((+|-) T)* ; T -> F ((*|/) F)* ; F -> NUM | (E)
+    static class Parser {
+        private final Lexer lex; private Tok cur;
+        Parser(String s){ lex=new Lexer(s); cur=lex.next(); }
+        private void eat(T t){ if(cur.t!=t) throw new RuntimeException("Expected "+t+" got "+cur.t); cur=lex.next(); }
+        double parse(){ return expr(); }
+        private double expr(){
+            double v = term();
+            while(cur.t==T.PLUS || cur.t==T.MINUS){
+                if(cur.t==T.PLUS){ eat(T.PLUS); v += term(); }
+                else { eat(T.MINUS); v -= term(); }
+            }
+            return v;
+        }
+        private double term(){
+            double v = factor();
+            while(cur.t==T.MUL || cur.t==T.DIV){
+                if(cur.t==T.MUL){ eat(T.MUL); v *= factor(); }
+                else { eat(T.DIV); v /= factor(); }
+            }
+            return v;
+        }
+        private double factor(){
+            if(cur.t==T.NUM){ double v=Double.parseDouble(cur.s); eat(T.NUM); return v; }
+            if(cur.t==T.LPAREN){ eat(T.LPAREN); double v=expr(); eat(T.RPAREN); return v; }
+            throw new RuntimeException("Unexpected token "+cur.t);
+        }
+    }
+
+    public static void main(String[] args){
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter expression (or blank to exit):");
+        while(true){
+            String line = sc.nextLine().trim();
+            if(line.isEmpty()) break;
+            try { double v = new Parser(line).parse(); System.out.println("Result: "+v); }
+            catch(Exception e){ System.out.println("Error: "+e.getMessage()); }
+        }
+    }
+}
