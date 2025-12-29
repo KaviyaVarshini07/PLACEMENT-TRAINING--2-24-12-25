@@ -1,0 +1,53 @@
+import java.util.*;
+
+public class GCMarkSweep {
+    static class Obj {
+        final int id;
+        final List<Obj> refs = new ArrayList<>();
+        boolean marked = false;
+        Obj(int id){ this.id = id; }
+        void ref(Obj o){ refs.add(o); }
+        public String toString(){ return "Obj"+id; }
+    }
+
+    static class Heap {
+        final List<Obj> objects = new ArrayList<>();
+        final Set<Obj> roots = new HashSet<>();
+        Obj alloc(){ Obj o = new Obj(objects.size()); objects.add(o); return o; }
+        void addRoot(Obj o){ roots.add(o); }
+        void removeRoot(Obj o){ roots.remove(o); }
+
+        void mark(){
+            Deque<Obj> stack = new ArrayDeque<>(roots);
+            roots.forEach(r -> r.marked = true);
+            while(!stack.isEmpty()){
+                Obj o = stack.pop();
+                for(Obj r: o.refs){
+                    if(!r.marked){ r.marked = true; stack.push(r); }
+                }
+            }
+        }
+        void sweep(){
+            Iterator<Obj> it = objects.iterator();
+            while(it.hasNext()){
+                Obj o = it.next();
+                if(!o.marked) { System.out.println("Collecting "+o); it.remove(); }
+                else o.marked = false; // reset for next cycle
+            }
+        }
+        void gc(){ mark(); sweep(); }
+    }
+
+    public static void main(String[] args){
+        Heap heap = new Heap();
+        Obj a = heap.alloc(); Obj b = heap.alloc(); Obj c = heap.alloc(); Obj d = heap.alloc();
+        a.ref(b); b.ref(c); // a->b->c ; d is isolated
+        heap.addRoot(a);
+        System.out.println("GC cycle 1:");
+        heap.gc(); // should collect d
+        heap.removeRoot(a); // now all become unreachable
+        System.out.println("GC cycle 2:");
+        heap.gc();
+        System.out.println("Remaining objects: "+heap.objects.size());
+    }
+}
