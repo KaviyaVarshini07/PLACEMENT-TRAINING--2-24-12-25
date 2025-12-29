@@ -1,0 +1,88 @@
+import java.util.*;
+
+public class NeuralXOR {
+    static class NN {
+        int input=2, hidden=3, output=1;
+        double[][] W1 = new double[hidden][input];
+        double[] b1 = new double[hidden];
+        double[][] W2 = new double[output][hidden];
+        double[] b2 = new double[output];
+        Random rnd = new Random(42);
+
+        NN(){
+            init(W1); init(W2);
+            Arrays.fill(b1, 0.0); Arrays.fill(b2, 0.0);
+        }
+        void init(double[][] W){ for(int i=0;i<W.length;i++) for(int j=0;j<W[0].length;j++) W[i][j] = rnd.nextGaussian()*0.5; }
+        static double sigmoid(double x){ return 1.0/(1.0+Math.exp(-x)); }
+        static double dsigmoid(double y){ return y*(1-y); }
+
+        double[] forward(double[] x){
+            double[] h = new double[hidden];
+            for(int i=0;i<hidden;i++){
+                double s=b1[i];
+                for(int j=0;j<input;j++) s += W1[i][j]*x[j];
+                h[i] = sigmoid(s);
+            }
+            double[] o = new double[output];
+            for(int i=0;i<output;i++){
+                double s=b2[i];
+                for(int j=0;j<hidden;j++) s += W2[i][j]*h[j];
+                o[i] = sigmoid(s);
+            }
+            return o;
+        }
+
+        void train(double[][] X, double[][] Y, int epochs, double lr){
+            for(int e=0;e<epochs;e++){
+                double loss=0;
+                for(int n=0;n<X.length;n++){
+                    double[] x=X[n], y=Y[n];
+                    // forward
+                    double[] h = new double[hidden];
+                    double[] zh = new double[hidden];
+                    for(int i=0;i<hidden;i++){
+                        double s=b1[i]; for(int j=0;j<input;j++) s+=W1[i][j]*x[j];
+                        zh[i]=s; h[i]=sigmoid(s);
+                    }
+                    double[] o = new double[output];
+                    double[] zo = new double[output];
+                    for(int i=0;i<output;i++){
+                        double s=b2[i]; for(int j=0;j<hidden;j++) s+=W2[i][j]*h[j];
+                        zo[i]=s; o[i]=sigmoid(s);
+                    }
+                    loss += 0.5*Math.pow(o[0]-y[0],2);
+
+                    // backprop
+                    double[] deltaO = new double[output];
+                    for(int i=0;i<output;i++) deltaO[i] = (o[i]-y[i]) * dsigmoid(o[i]);
+                    double[] deltaH = new double[hidden];
+                    for(int i=0;i<hidden;i++){
+                        double sum=0; for(int k=0;k<output;k++) sum += W2[k][i]*deltaO[k];
+                        deltaH[i] = sum * dsigmoid(h[i]);
+                    }
+                    for(int i=0;i<output;i++){
+                        for(int j=0;j<hidden;j++) W2[i][j] -= lr * deltaO[i]*h[j];
+                        b2[i] -= lr * deltaO[i];
+                    }
+                    for(int i=0;i<hidden;i++){
+                        for(int j=0;j<input;j++) W1[i][j] -= lr * deltaH[i]*x[j];
+                        b1[i] -= lr * deltaH[i];
+                    }
+                }
+                if(e%1000==0) System.out.printf("Epoch %d, loss=%.6f%n", e, loss);
+            }
+        }
+    }
+
+    public static void main(String[] args){
+        double[][] X = {{0,0},{0,1},{1,0},{1,1}};
+        double[][] Y = {{0},{1},{1},{0}};
+        NN nn = new NN();
+        nn.train(X, Y, 10000, 0.1);
+        for(double[] x: X){
+            double[] o = nn.forward(x);
+            System.out.printf("Input %s -> %.4f%n", Arrays.toString(x), o[0]);
+        }
+    }
+}
