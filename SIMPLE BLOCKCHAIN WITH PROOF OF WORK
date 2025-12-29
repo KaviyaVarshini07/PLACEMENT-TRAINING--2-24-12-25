@@ -1,0 +1,64 @@
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.*;
+
+public class SimpleChain {
+    static class Block {
+        final int index;
+        final long timestamp;
+        final String data;
+        final String prevHash;
+        int nonce = 0;
+        String hash;
+        Block(int index, String data, String prevHash){
+            this.index=index; this.data=data; this.prevHash=prevHash; this.timestamp=System.currentTimeMillis();
+            this.hash = computeHash();
+        }
+        String computeHash(){
+            try {
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                byte[] bytes = md.digest((index+":"+timestamp+":"+data+":"+prevHash+":"+nonce)
+                        .getBytes(StandardCharsets.UTF_8));
+                StringBuilder sb = new StringBuilder();
+                for(byte b: bytes) sb.append(String.format("%02x", b));
+                return sb.toString();
+            } catch (Exception e) { throw new RuntimeException(e); }
+        }
+        void mine(int difficulty){
+            String target = "0".repeat(difficulty);
+            while(!hash.startsWith(target)){
+                nonce++;
+                hash = computeHash();
+            }
+            System.out.println("Mined block "+index+" with hash "+hash);
+        }
+    }
+
+    static class Blockchain {
+        final List<Block> chain = new ArrayList<>();
+        final int difficulty;
+        Blockchain(int difficulty){ this.difficulty=difficulty; chain.add(genesis()); }
+        private Block genesis(){ Block b = new Block(0, "Genesis", "0"); b.mine(difficulty); return b; }
+        void add(String data){
+            Block prev = chain.get(chain.size()-1);
+            Block b = new Block(prev.index+1, data, prev.hash);
+            b.mine(difficulty);
+            chain.add(b);
+        }
+        boolean valid(){
+            for(int i=1;i<chain.size();i++){
+                Block cur=chain.get(i), prev=chain.get(i-1);
+                if(!cur.hash.equals(cur.computeHash())) return false;
+                if(!cur.prevHash.equals(prev.hash)) return false;
+            }
+            return true;
+        }
+    }
+
+    public static void main(String[] args){
+        Blockchain bc = new Blockchain(4);
+        bc.add("Alice pays Bob 10");
+        bc.add("Bob pays Carol 5");
+        System.out.println("Chain valid? "+bc.valid());
+    }
+}
