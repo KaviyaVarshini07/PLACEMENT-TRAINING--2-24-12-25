@@ -1,0 +1,67 @@
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class ChatServer {
+    private final int port;
+    private final Set<ClientHandler> clients = ConcurrentHashMap.newKeySet();
+
+    public ChatServer(int port) { this.port = port; }
+
+    public void start() throws IOException {
+        ServerSocket server = new ServerSocket(port);
+        System.out.println("ChatServer running on port " + port);
+        while (true) {
+            Socket socket = server.accept();
+            ClientHandler handler = new ClientHandler(socket);
+            clients.add(handler);
+            new Thread(handler).start();
+        }
+    }
+
+    private void broadcast(String msg, ClientHandler from) {
+        for (ClientHandler c : clients) {
+            if (c != from) c.send(msg);
+        }
+    }
+
+    private class ClientHandler implements Runnable {
+        private final Socket socket;
+        private String name = "anon";
+        private PrintWriter out;
+
+        ClientHandler(Socket socket) { this.socket = socket; }
+
+        public void run() {
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                out = new PrintWriter(socket.getOutputStream(), true);
+                out.println("Welcome. Use /name YourName to set name.");
+                String line;
+                while ((line = in.readLine()) != null) {
+                    if (line.startsWith("/name ")) {
+                        name = line.substring(6).trim();
+                        out.println("Name set to " + name);
+                    } else if (line.equals("/quit")) {
+                        break;
+                    } else {
+                        String msg = name + ": " + line;
+                        System.out.println(msg);
+                        broadcast(msg, this);
+                    }
+                }
+            } catch (IOException ignored) {
+            } finally {
+                clients.remove(this);
+                try { socket.close(); } catch (IOException ignored) {}
+            }
+        }
+
+        void send(String msg) { if (out != null) out.println(msg); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : 5555;
+        new ChatServer(port).start();
+    }
+}
